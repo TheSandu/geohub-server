@@ -102,7 +102,11 @@ class DatabaseSeeder extends Seeder
         }
 
         foreach (Group::all() as $id => $group) {
-            $group->users()->attach( $id + 1, ['user_role' => 'editor']);
+
+            $group->users()->attach( 1, ['user_role' => 'owner']);
+
+            if( $group->id !== 1 )
+                $group->users()->attach( $group->id, ['user_role' => 'editor']);
         }
 
         if(Graphic::all()->count() == 0) {
@@ -112,6 +116,7 @@ class DatabaseSeeder extends Seeder
                     'geometry' => $graphic['geometry'],
                     'attributes' => $graphic['attributes'],
                     'extent' => $graphic['extent'],
+                    'user_id' => 1,
                 ]);
             }
         }

@@ -11,9 +11,11 @@ class GroupController extends Controller
 {
     public function getGroups(Request $request): \Illuminate\Http\JsonResponse
     {
-        $groups = Group::all();
+        $owner = User::where('remember_token', $request->header('token'))->first();
 
-        return response()->json(["state" => 0, "data" => $groups], 200);
+        $groups = Group::where('owner_id', $owner->id)->get();
+
+        return response()->json(["state" => 0, "data" => $groups ], 200);
     }
 
     public function getGroup(Request $request): \Illuminate\Http\JsonResponse
@@ -40,7 +42,11 @@ class GroupController extends Controller
 
         $name = $request->input('name');
 
-        $groups = Group::where('name', 'LIKE', "%{$name}%")->get();
+        $owner = User::where('remember_token', $request->header('token'))->first();
+
+        $groups = Group::where('name', 'LIKE', "%{$name}%")
+            ->where('owner_id', $owner->id)
+            ->get();
 
         if( !$groups )
             return response()->json(["state" => 1, "data" => []], 404);
@@ -183,7 +189,8 @@ class GroupController extends Controller
             'owner_id' => 'required'
         ]);
 
-        $owner = User::find( $request->input('owner_id') );
+//        $owner = User::find( $request->input('owner_id') );
+        $owner = User::where('remember_token', $request->header('token'))->first();
 
         if( !$owner )
             return response()->json(["state" => 1, "data" => null], 404);
@@ -192,6 +199,8 @@ class GroupController extends Controller
         $newGroup->name = $request->input('name');
         $newGroup->owner_id = $owner->id;
         $newGroup->save();
+
+        $newGroup->users()->attach( $owner->id, [ "user_role" => "Owner" ]);
 
         return response()->json(["state" => 0, "data" => $newGroup], 200);
     }

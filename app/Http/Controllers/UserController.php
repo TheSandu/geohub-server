@@ -2,60 +2,68 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Layer;
+use App\Models\Group;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 
 class UserController extends Controller
 {
-    public function login(Request $request)
+    public function login(Request $request): \Illuminate\Http\JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|string|email|max:255',
+        $credentials = $request->only('email','password');
+        $request->validate([
+            'email' => 'required|email',
             'password' => 'required',
         ]);
+        if (auth('api')->attempt($credentials,true)) {
+            $user = auth('api')->user();
 
-        if ($validator->fails()) {
-            return response(['errors'=>$validator->errors()->all()], 422);
-        }
-
-        $user = User::where('email', $request->email)->first();
-
-        if ($user) {
-            if (Hash::check($request->password, $user->password)) {
-                $token = $user->getRememberToken();
-                $response = ['token' => $token, 'user' => $user];
-                return response($response, 200);
-            } else {
-                $response = ["message" => "Password mismatch"];
-                return response($response, 422);
-            }
+            $success['token'] = auth('api')->user()->getRememberToken();
+            return response()->json([
+                'success' => true,
+                'token' => $success,
+                'user' => $user
+            ]);
         } else {
-            $response = ["message" =>'User does not exist'];
-            return response($response, 422);
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid Email or Password',
+            ], 401);
         }
     }
 
-    public function register (Request $request) {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
-            'password' => 'required|string|min:6|confirmed',
+    public function register(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $request->validate([
+            'email' => 'email|required|unique:users',
+            'name' => 'required',
+            'password' => 'required|min:1|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/',
+            'confirm_password' => 'required|same:password'
         ]);
-        if ($validator->fails())
-        {
-            return response(['errors'=>$validator->errors()->all()], 422);
+
+        if(!User::where('email', strtolower($request->input('email')))->first()) {
+            $bcryptPass = bcrypt($request->input('password'));
+            $user = User::create([
+                'name' => $request->input('name'),
+                'email' => strtolower($request->input('email')),
+                'password' => $bcryptPass,
+            ]);
+
+            if(auth('api')->attempt($request->only('email','password'),true)) {
+                $token = auth('api')->user()->getRememberToken();
+
+                return response()->json([
+                    'success' => true,
+                    'token' => $token,
+                    'user' => $user
+                ], 200);
+            }
+
+            return response()->json(['error'=>'61: Unauthorised'], 401);
         }
-        $request['password'] = Hash::make($request['password']);
-        $request['remember_token'] = Str::random(10);
-        $user = User::create($request->toArray());
-        $token = $user->createToken('Laravel Password Grant Client')->accessToken;
-        $response = ['token' => $token];
-        return response($response, 200);
+
+        return response()->json(['error'=>'64: Unauthorised'], 401);
+
     }
 
     public function logout(Request $request): \Illuminate\Http\JsonResponse
@@ -76,29 +84,32 @@ class UserController extends Controller
 
     public function getUserLayers(Request $request): \Illuminate\Http\JsonResponse
     {
-        $request->validate([
-            'id' => 'required'
-        ]);
 
-        $id = $request->input('id');
+        $user = User::where('remember_token', $request->header('token'))->first();
 
-        $users = User::find( $id );
-
-        if( !$users )
+        if( !$user )
             return response()->json(["state" => 1, "data" => null], 200);
 
-        $groups = $users->groups;
+        $groups = $user->groups;
 
         $layers = [];
 
         foreach( $groups as $group) {
             $groupLayers = $group->layers;
             foreach ( $groupLayers as $layer ) {
+                $layer["group_id"] = $group->id;
                 $layers[] = $layer;
             }
         }
 
         return response()->json(["state" => 0, "data" => $layers], 200);
+    }
+
+    public function getCurentUser(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $user = User::where('remember_token', $request->header('token'))->first();
+
+        return response()->json(["state" => 0, "data" => $user], 200);
     }
 
     public function getUser(Request $request): \Illuminate\Http\JsonResponse
@@ -125,7 +136,14 @@ class UserController extends Controller
 
         $name = $request->input('name');
 
-        $users = User::where('name', 'LIKE', "%{$name}%")->get();
+        $users = null;
+
+        if( $request->has('group_id') ) {
+            $group = Group::find( $request->input('group_id') );
+            $users = $group->users()->where('name', 'LIKE', "%{$name}%")->get();
+        } else {
+            $users = User::where('name', 'LIKE', "%{$name}%")->get();
+        }
 
         if( !$users )
             return response()->json(["state" => 1, "data" => []], 404);

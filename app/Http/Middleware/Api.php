@@ -17,9 +17,10 @@ class Api
      */
     public function handle(Request $request, Closure $next)
     {
+
         $user = User::where('remember_token', $request->header('token'))->first();
 
-        if($request->hasHeader('token')){
+        if($request->hasHeader('token')) {
             if($user == null)
                 return response()->json(['error'=>'Unauthorised'], 401);
 

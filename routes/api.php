@@ -16,14 +16,9 @@ use App\Http\Controllers\UserController;
 |
 */
 
-
-Route::middleware(['cors'])->group(function () {
-    Route::post('/login', [UserController::class, 'login']);
-    Route::post('/register', [UserController::class, 'register']);
-});
-
 Route::middleware([
-//    'api.auth',
+    'api.auth',
+//    'auth:api',
     'cors'
 ])->group(function () {
     Route::post('/group/getGroups', [GroupController::class, 'getGroups']);
@@ -46,16 +41,28 @@ Route::middleware([
     Route::post('/layer/getLayersByName', [LayerController::class, 'getLayersByName']);
 
     Route::post('/layer/getLayerGraphics', [LayerController::class, 'getLayerGraphics']);
+    Route::post('/layer/getLayerBordering', [LayerController::class, 'getLayerBordering']);
+    Route::post('/layer/getUserLayerBordering', [LayerController::class, 'getUserLayerBordering']);
+
     Route::post('/layer/addLayer', [LayerController::class, 'addLayer']);
+    Route::post('/layer/addBorder', [LayerController::class, 'addBorder']);
+    Route::post('/layer/deleteLayer', [LayerController::class, 'deleteLayer']);
     Route::post('/layer/addGraphicToLayer', [LayerController::class, 'addGraphicToLayer']);
     Route::post('/layer/updateLayerGraphic', [LayerController::class, 'updateLayerGraphic']);
-    Route::post('/layer/deleteLayer', [LayerController::class, 'deleteLayer']);
+    Route::post('/layer/deleteLayerGraphic', [LayerController::class, 'deleteLayerGraphic']);
 
     Route::post('/user/getUser', [UserController::class, 'getUser']);
+    Route::post('/user/getCurentUser', [UserController::class, 'getCurentUser']);
+
     Route::post('/user/getUsers', [UserController::class, 'getUsers']);
     Route::post('/user/getUsersByName', [UserController::class, 'getUsersByName']);
     Route::post('/user/getUserLayers', [UserController::class, 'getUserLayers']);
     Route::post('/user/addUser', [UserController::class, 'addUser']);
 
     Route::post('/logout', [UserController::class, 'logout']);
+});
+
+Route::middleware(['cors'])->group(function () {
+    Route::post('/login', [UserController::class, 'login']);
+    Route::post('/register', [UserController::class, 'register']);
 });
